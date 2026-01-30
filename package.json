@@ -4,6 +4,9 @@
   "description": "Scraping library for CampusSquare university portal",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "campus-square-scraper": "dist/cli.js"
+  },
   "files": [
     "dist"
   ],
