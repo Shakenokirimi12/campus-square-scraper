@@ -1,6 +1,6 @@
 {
   "name": "campus-square-scraper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Scraping library for CampusSquare university portal",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
