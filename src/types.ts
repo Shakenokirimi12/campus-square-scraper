@@ -18,6 +18,12 @@ export interface CampusSquareConfig {
   baseUrl: string;
   userAgent?: string;
   debugNotify?: (title: string, message: string, tags?: string) => Promise<void>;
+  /**
+   * Cookie management strategy.
+   * - 'manual': Manually parse and set Cookie header (for Node.js). Default.
+   * - 'browser': Rely on browser's native cookie jar (credentials: 'include').
+   */
+  cookieStrategy?: 'manual' | 'browser';
 }
 
 export interface LoginResult {

@@ -16,6 +16,7 @@ export class CampusSession {
   async login(uid: string, pass: string): Promise<LoginResult> {
     let currentStep = "INIT";
     let lastSid = "None";
+    const isBrowser = this.config.cookieStrategy === 'browser';
 
     try {
       await new Promise(r => setTimeout(r, 200));
@@ -23,8 +24,8 @@ export class CampusSession {
       // STEP 1: Landing
       currentStep = "STEP 1: Landing";
       const res1 = await fetch(`${this.config.baseUrl}/campusportal.do?locale=ja_JP`, {
-        headers: { 'User-Agent': this.config.userAgent },
-        credentials: 'omit'
+        headers: this.getHeaders(),
+        credentials: isBrowser ? 'include' : 'omit'
       });
 
       if (!res1.ok) {
@@ -33,39 +34,45 @@ export class CampusSession {
 
       const text1 = await res1.text();
       const rwfHash = text1.match(/'rwfHash'\s*:\s*'([a-f0-9]+)'/)?.[1] || "";
-      const initialSid = res1.headers.get('set-cookie')?.match(/JSESSIONID=([A-Z0-9]+)/)?.[1] || "";
-      lastSid = initialSid;
+      
+      let initialSid = "";
+      if (!isBrowser) {
+        initialSid = res1.headers.get('set-cookie')?.match(/JSESSIONID=([A-Z0-9]+)/)?.[1] || "";
+        lastSid = initialSid;
+      }
 
       if (!rwfHash) await this.logger.notify(currentStep, "rwfHash not found in HTML", "question");
 
       // STEP 2: Login POST
       currentStep = "STEP 2: Login POST";
       const postBody = `wfId=nwf_PTW0000002_login&userName=${uid}&password=${pass}&locale=ja_JP&undefined=&action=rwf&tabId=home&page=&rwfHash=${rwfHash}`;
+      
       const res2 = await fetch(`${this.config.baseUrl}/campusportal.do`, {
         method: 'POST',
         body: postBody,
         headers: {
-          'User-Agent': this.config.userAgent,
-          'Cookie': `JSESSIONID=${initialSid}`,
+          ...this.getHeaders(initialSid),
           'Content-Type': 'application/x-www-form-urlencoded',
           'Referer': `${this.config.baseUrl}/campusportal.do?locale=ja_JP`,
           'Origin': new URL(this.config.baseUrl).origin
         },
-        credentials: 'omit'
+        credentials: isBrowser ? 'include' : 'omit'
       });
 
-      const authenticatedSid = res2.headers.get('set-cookie')?.match(/JSESSIONID=([A-Z0-9]+)/)?.[1] || initialSid;
-      lastSid = authenticatedSid;
+      let authenticatedSid = isBrowser ? "BROWSER_MANAGED" : initialSid;
+      if (!isBrowser) {
+        authenticatedSid = res2.headers.get('set-cookie')?.match(/JSESSIONID=([A-Z0-9]+)/)?.[1] || initialSid;
+        lastSid = authenticatedSid;
+      }
 
       // STEP 3: Stabilization (Check login success)
       currentStep = "STEP 3: page=main";
       const res3 = await fetch(`${this.config.baseUrl}/campusportal.do?page=main`, {
         headers: {
-          'User-Agent': this.config.userAgent,
-          'Cookie': `JSESSIONID=${authenticatedSid}`,
+          ...this.getHeaders(authenticatedSid),
           'Referer': `${this.config.baseUrl}/campusportal.do`
         },
-        credentials: 'omit'
+        credentials: isBrowser ? 'include' : 'omit'
       });
       const mainHtml = await res3.text();
 
@@ -86,16 +93,37 @@ export class CampusSession {
    * 認証済みセッションを使用してリクエストを行います。
    */
   async fetch(url: string, sid: string, options: RequestInit = {}): Promise<Response> {
+    const isBrowser = this.config.cookieStrategy === 'browser';
+    
     const headers = {
-      'User-Agent': this.config.userAgent,
-      'Cookie': `JSESSIONID=${sid}`,
+      ...this.getHeaders(sid),
       ...options.headers,
     };
 
     return fetch(url, {
       ...options,
       headers,
-      credentials: 'omit'
+      credentials: isBrowser ? 'include' : 'omit'
     });
+  }
+
+  /**
+   * 共通ヘッダーを生成します。
+   * browserモードの場合はCookieヘッダーを含めません（User-Agentもブラウザが自動設定する場合は上書き不可なことがあるため注意が必要ですが、ここでは設定を試みます）
+   */
+  private getHeaders(sid?: string): Record<string, string> {
+    const headers: Record<string, string> = {};
+    
+    // User-Agentは設定があれば入れる（ブラウザではRefusedになる場合があるが、fetch仕様上は設定可能な場合も多い）
+    if (this.config.userAgent) {
+      headers['User-Agent'] = this.config.userAgent;
+    }
+
+    // ManualモードかつSIDがある場合のみCookieヘッダーを手動設定
+    if (this.config.cookieStrategy === 'manual' && sid) {
+      headers['Cookie'] = `JSESSIONID=${sid}`;
+    }
+
+    return headers;
   }
 }
