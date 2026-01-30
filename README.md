@@ -89,7 +89,21 @@ console.log(sid); // 認証済みセッションID
 | --- | --- | --- | --- |
 | `baseUrl` | `string` | ✅ | CampusSquareのベースURL (例: `.../campusweb`) |
 | `userAgent` | `string` | | リクエスト時に使用するUser-Agent |
+| `cookieStrategy` | `'manual' \| 'browser'` | | Cookie管理方法。Node.jsなら `'manual'`、ブラウザなら `'browser'` |
 | `debugNotify` | `function` | | デバッグログを受け取るコールバック関数 |
+
+## ブラウザでの利用
+
+ブラウザ拡張機能などで利用する場合、Cookieの管理をブラウザに任せる必要があります。
+
+```typescript
+const service = new CampusSquareService({
+  baseUrl: 'https://...',
+  cookieStrategy: 'browser'
+});
+```
+
+※ 一般的なWebサイトから実行する場合、CORS制限に注意してください。
 
 ## 要件
 
